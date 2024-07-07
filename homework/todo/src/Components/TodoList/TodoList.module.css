@@ -1,0 +1,21 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  width: 500px;
+}
+
+.item {
+  display: flex;
+  gap: 40px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+}
+
+.remove {
+  cursor: pointer;
+  color: red;
+}

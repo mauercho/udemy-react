@@ -351,3 +351,204 @@ ReactDOM.createRoot(document.getElementById('root')).render(
 
 ```
 - 이런 식으로 추가하면 됨.
+
+### 레이아웃 라우트 사용법
+- 라우트끼리 레이아웃 요소를 공유해야할 때가 있음. ex) 네비게이션 바
+- 레이아웃 라우트 쓰면 됨. 내부에 다른 라우트를 포함하는 라우트
+- 라우트로 사용하는 컴포넌트는 보통 routes 폴더에 넣음.
+
+```jsx
+import MainHeader from '../components/MainHeader'
+import { Outlet } from 'react-router-dom'
+
+function RootLayout() {
+	return (
+		<>
+			<MainHeader />
+			<Outlet />
+		</>
+	)
+}
+
+export default RootLayout
+
+```
+- 이런 식으로 라우트로 사용하는 컴포넌트만듬.
+- Outlet 부분에 children이 들어가는 거임.
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import App from './App'
+import NewPost from './components/NewPost'
+import './index.css'
+import RootLayout from './routes/RootLayout'
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      {path: '/', element: <App />},
+      {path: '/create-post', element: <NewPost />},
+    ],
+  },
+])
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <RouterProvider router= {router} />
+  </React.StrictMode>
+)
+
+```
+- 위에 보면 라우터로 사용하는 RootLayout 밑에 children으로 붙은거 확인하고 있음.
+
+### 경로 연결
+- a태그를 이용하면 새로운 요청을 리액트 앱에 보냄. 싱글 페이지 어플리케이션을 쓸 때 이러면 전역으로 관리하던 상태 잃어버림. 모든 자바스크립트 코드 다운로드 다시 받음. 해결방법으로 react-router-dom 의 Link 컴포넌트 사용
+- Link도 내부적으로 앵커 요소를 렌더링하지만 Link는 브라우저가 자동으로 요청을 전송하지 못 하게 막아줌.
+
+```jsx
+import classes from './Modal.module.css'
+import { useNavigate } from 'react-router-dom'
+
+function Modal({children}){
+	const navigate = useNavigate()
+	function closeHandler() {
+		navigate('..')
+	}
+
+	return (
+		<>
+			<div className={classes.backdrop} onClick={closeHandler} />
+			<dialog open className={classes.modal}>{children}</dialog>
+		</>
+	)
+```
+- 이런 식으로 useNavigate 훅 쓸 수도 있음. ..하면 상위라우트로 이동함.
+- Link 도 to=".." 하면 상위라우트로 감.
+
+### loader()로 데이터 가져오기.
+- 리액트 6.4 버전 이상부터 있는 데이터의 전송과 회송을 도와주는 기능
+- useEffect 대신 쓸수 있음.
+
+```jsx
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      {
+        path: '/',
+        element: <Posts />,
+        loader: postsLoader,
+        children: [{path: '/create-post', element: <NewPost />},]
+      },
+    ],
+  },
+])
+```
+- 이런 식으로 쓰고 Posts.jsx에서
+
+```jsx
+export async function loader() {
+  const response = await fetch('http://localhost:8080/posts')
+  const resData = await response.json()
+  return resData.posts
+}
+```
+- 이렇게 받을 수 있고 이 posts를 아래와 같이 받을 수 있음.
+
+```jsx
+import { useLoaderData } from 'react-router-dom'
+
+function PostList(){
+	const posts = useLoaderData()
+}
+```
+- loader가 끝나길 기다렸다가 이후에 요소를 렌더링함.
+
+### Form
+- Form 요소를 기본 내장 'form' 대신 사용하면 리액트 라우터가 폼 전송을 처리해 브라우저가 요청을 전송하지 못하게 막아줌.
+- 그뿐 아니라 모든 입력 데이터를 수집하고 우리 대신 해당 데이터로 객체를 구성해줌.
+- redirect를 이용해서 다른 라우트로 이동하게 만들어줄 수 있음.
+
+```jsx
+import classes from './NewPost.module.css';
+import { Link, Form, redirect } from 'react-router-dom';
+import Modal from '../components/Modal'
+
+function NewPost() {
+
+  return (
+    <Modal>
+    <Form method="post" className={classes.form}>
+      <p>
+        <label htmlFor="body">Text</label>
+        <textarea id="body" name="body" required rows={3} />
+      </p>
+      <p>
+        <label htmlFor="name">Your name</label>
+        <input type="text" id="name" name="author" required />
+      </p>
+      <p className={classes.actions}>
+        <Link to=".." type="button">Cancel</Link>
+        <button>Submit</button>
+      </p>
+    </Form>
+    </Modal>
+  );
+}
+
+export default NewPost;
+
+export async function action({request}) {
+  const formData = await request.formData()
+  const postData = Object.fromEntries(formData)
+  await fetch('http://localhost:8080/posts', {
+    method: 'POST',
+    body: JSON.stringify(postData),
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+  return redirect('/')
+}
+
+```
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import Posts, {loader as postsLoader} from './routes/Posts'
+import NewPost, { action as newPostAction } from './routes/NewPost'
+import './index.css'
+import RootLayout from './routes/RootLayout'
+
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <RootLayout />,
+    children: [
+      {
+        path: '/',
+        element: <Posts />,
+        loader: postsLoader,
+        children: [{path: '/create-post', element: <NewPost />, action: newPostAction },]
+      },
+    ],
+  },
+])
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <RouterProvider router= {router} />
+  </React.StrictMode>
+)
+
+```
+
+- 동적 라우트를 이용해서 detail 페이지 구현 가능
+- 너무 복잡함. 차차 공부하기.

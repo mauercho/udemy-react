@@ -266,3 +266,88 @@ function addPostHandler(postData){
 - 내장 메서드 map을 이용함. 배열의 모든 항목에 대해 Post Jsx 로 바꿔줌.
 - key 프로퍼티 안써주면 오류는 안나는데 경고남.
 
+### 리액트 SPA에 백엔드 추가하기.
+- 데모 웹사이트는 브라우저 내에서만 작동
+- 리액트로 만드는 것은 대부분 싱글페이지어플리케이션임. html 파일 하나만 있고 화면에 있는 모든 동작들은 자바스크립트에 의한 것
+- 백엔드가 있어서 요청을 보내고 응답을 받을 수 있다면, 거기에 데이터베이스를 두고 데이터를 저장할 수 있음.
+- 백엔드라는 건 서버에서 구동되는 별도의 웹 애플리케이션, 웹 API, REST API 같은 걸 말합니다
+- 리액트는 프론트엔트 라이브러리임. 물론 Nextjs나 Remix 같은 프레임워크를 리액트 윗단에 올려 백엔드 코드와 섞어 리액트 앱에서 쓸 수 있음.
+
+```jsx
+function addPostHandler(postData){
+		fetch('http://localhost:8080/posts', {
+			method: 'POST',
+			body: JSON.stringify(postData),
+			headers: {
+				'Content-Type': 'application/json'
+			}
+		})
+		setPosts((existingPosts) => [postData, ...existingPosts])
+	}
+```
+- 이런식으로 보냄. jso에 저장만 함.
+- 이걸 어떻게 가져올까 ? -> get요청 보내고 응답을 받아 업데이트 하는 거임.
+- async-await 보통 쓰는데 함수 앞에 async 붙이면 promise 객체 반환. 리액트는 jsx 반환해야함.
+
+```jsx
+fetch('http://localhost:8080/posts').then(response => response.json()).then(data => {
+		setPosts(data.posts)
+	})
+```
+- 그냥 이렇게 쓰면 무한루프 발생함. ui 업데이트하면 컴포넌트 함수 다시 실행되고 fetch요청 다시보내고 ... 무한 반복
+- useEffect 훅 사용해서 해결 가능. 두개의 인자로 함수하고 배열을 받음.
+- useEffect()로 코드를 래핑하면 그 코드는 컴포넌트 함수가 실행될 때마다 매번 실행되지 않음
+- useEffect 함수는 언제 실행될까 ? -> 두번째 인자로 받는 배열에 의해 결정됨. 함수 밖에 있는 그 변수 또는 함수가 변경될 때마다 실행됨. 빈 배열이여서 한번만 실행.
+
+### 로딩 상태 관리
+
+```jsx
+const [isFetching, setIsFetching] = useState(false)
+	useEffect(() => {
+		async function fetchPosts() {
+			setIsFetching(true)
+			const response = await fetch('http://localhost:8080/posts')
+			const resData = await response.json()
+			setPosts(resData.posts)
+			setIsFetching(false)
+		}
+		fetchPosts()
+	}, [])
+```
+- 이런식으로 setIsFetching으로 로딩 상태때 어떻게 나올지 표시할 수 있음./
+```jsx
+		{!isFetching && posts.length === 0 && (
+			<div style={{textAlign: 'center', color:'white'}}>
+				<h2>There are no posts yet</h2>
+				<p>Start adding some!</p>
+			</div>
+		)}
+		{isFetching && <div style={{textAlign: 'center', color:'white'}}><p>Loading posts...</p></div>}
+```
+
+### 라우팅 기능 추가
+- 라우팅은 간단히 말해 여러 경로를 정의해 여러 페이지를 로드하고 해당 경로에서 다른 컴포넌트를 로드하기 위해 사용함.
+- 리액트 앱이 SPA로 만들어 있다고 하더라도 이런 라우팅 동작 구현하는 방법 있음. -> 리액트 라우터 패키지 사용하면 됨.
+- npm install react-router-dom 실행
+
+```jsx
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { RouterProvider, createBrowserRouter } from 'react-router-dom'
+import App from './App'
+import NewPost from './components/NewPost'
+import './index.css'
+
+const router = createBrowserRouter([
+  {path: '/', element: <App />},
+  {path: '/create-post', element: <NewPost />}
+])
+
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <RouterProvider router= {router} />
+  </React.StrictMode>
+)
+
+```
+- 이런 식으로 추가하면 됨.

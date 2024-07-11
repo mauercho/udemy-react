@@ -186,3 +186,28 @@ function CoreConcept({ image, title, description }) {
 <CoreConcept {...CORE_CONCEPTS[2]} />
 <CoreConcept {...CORE_CONCEPTS[3]} />
 ```
+
+- 보통 components 라는 폴더에 컴포넌트들 넣음.
+- 별도의 컴포넌트는 별도의 파일에 저장하는 것이 좋음. 한 파일에 넣는 것은 매우 드물음. 연관성이 있거나 두 개의 컴포넌트가 함께 있어야 작동하는 경우
+- 나중에 css 코드를 컴포넌트별 css 파일로 구분하여 어떤 스타일이 어떤 컴포넌트에 적용되게 할 수 있음.
+
+## 컴포넌트 구성: 특별한 children Prop
+
+- 컴포넌트 열림과 닫힘 텍스트 사이에 무언가를 전달하면 리액트가 출력할 위치를 모르기 때문에 자동적으로 내용 출력되지 않음.
+- 속성 안써줘도 항상 받는 속성인 children prop 이용
+- attributes도 쓸수 있는데 선호하는거 쓰면 됨.
+
+```jsx
+// using children
+<TabButton>Components</TabButton>;
+
+function TabButton({ children }) {
+  return <button>{children}</button>;
+}
+
+// using attributes
+<TabButton label="Components" />;
+function TabButton({ label }) {
+  return <button>{label}</button>;
+}
+```

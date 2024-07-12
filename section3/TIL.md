@@ -211,3 +211,175 @@ function TabButton({ label }) {
   return <button>{label}</button>;
 }
 ```
+
+## 함수를 prop인자 값으로 전달하기
+
+```jsx
+// App.jsx
+function handleClick() {
+  console.log("Hello World");
+}
+<TabButton onSelect={handleClick}>Components</TabButton>;
+
+// TabButton.jsx
+export default function TabButton({ children, onSelect }) {
+  return (
+    <li>
+      <button onClick={onSelect}>{children}</button>
+    </li>
+  );
+}
+// 이런 식으로 접근 가능함.
+```
+
+- props에 인자 넣는 방법 -> 화살표 함수 쓰면 () 붙여도 자동으로 실행되지 않음. 함수를 다른 함수로 감싸는 느낌임.
+
+```jsx
+function handleClick(selectedButton) {
+    console.log(selectedButton);
+  }
+TabButton onSelect={() => handleClick("component")}>
+              Components</TabButton>
+```
+
+## State 관리 & 훅 사용법
+
+- 리액트는 기본적으로 컴포넌트 함수를 코드 내에서 처음 발견했을 때 한 번밖에 사용안함. 그걸 해결하기위한 State관리
+- useState라는 함수는 리액트 훅 use로 시작하는 것들은 다 리액트 훅임.
+- 리액트 훅은 컴포넌트 함수 또는 다른 리액트 훅 안에서 호출되어야함. 컴포넌트 함수 안에서 바로 호출해야하며 내부 함수 안에 중첩되면 안됨.
+- 컴포넌트에 연결된 상태를 관리하게 함. 데이터가 변경되면 이 hook이 자기가 속한 컴포넌트 함수를 활성화하여 리액트에 의해 재검토함.
+
+![alt text](image.png)
+
+```jsx
+import { useState } from "react";
+const [selectedTopic, setSelectedTopic] = useState("Please click a button");
+function handleClick(selectedButton) {
+  setSelectedTopic(selectedButton);
+}
+```
+
+- 상태를 업데이트하는 함수를 부를 때 리액트는 상태 업데이트 스케줄을 조정하여 컴포넌트 함수를 재실행함. (여기서는 App) 함수를 재실행하고 나서야 업데이트된 새로운 값 쓸 수 있음. console.log(selectedButton);
+
+```jsx
+const [selectedTopic, setSelectedTopic] = useState("components"); // 초기값 설정 EXAMPLES 가 객체인 점을 이용해서 이름으로 접근하는 느낌.
+<div id="tab-content">
+  <h3>{EXAMPLES[selectedTopic].title}</h3>
+  <p>{EXAMPLES[selectedTopic].description}</p>
+  <pre>
+    <code>{EXAMPLES[selectedTopic].code}</code>
+  </pre>
+</div>;
+```
+
+## 조건적 스타일링 -> 다양한 방법 있는데 다 알아두기
+
+```jsx
+//1
+const [selectedTopic, setSelectedTopic] = useState(); // 초기값을 비워두고
+{
+  !selectedTopic ? <p>Please select a topic.</p> : null;
+}
+{
+  selectedTopic ? (
+    <div id="tab-content">
+      <h3>{EXAMPLES[selectedTopic].title}</h3>
+      <p>{EXAMPLES[selectedTopic].description}</p>
+      <pre>
+        <code>{EXAMPLES[selectedTopic].code}</code>
+      </pre>
+    </div>
+  ) : null;
+}
+
+//2
+{
+  !selectedTopic ? (
+    <p>Please select a topic.</p>
+  ) : (
+    <div id="tab-content">
+      <h3>{EXAMPLES[selectedTopic].title}</h3>
+      <p>{EXAMPLES[selectedTopic].description}</p>
+      <pre>
+        <code>{EXAMPLES[selectedTopic].code}</code>
+      </pre>
+    </div>
+  );
+}
+
+//3
+{
+  !selectedTopic && <p>Please select a topic.</p>;
+}
+{
+  selectedTopic && (
+    <div id="tab-content">
+      <h3>{EXAMPLES[selectedTopic].title}</h3>
+      <p>{EXAMPLES[selectedTopic].description}</p>
+      <pre>
+        <code>{EXAMPLES[selectedTopic].code}</code>
+      </pre>
+    </div>
+  );
+}
+
+//4
+let tabContent = <p>Please select a topic.</p>;
+
+if (selectedTopic) {
+  tabContent = (
+    <div id="tab-content">
+      <h3>{EXAMPLES[selectedTopic].title}</h3>
+      <p>{EXAMPLES[selectedTopic].description}</p>
+      <pre>
+        <code>{EXAMPLES[selectedTopic].code}</code>
+      </pre>
+    </div>
+  );
+}
+
+{
+  tabContent;
+}
+```
+
+## CSS 스타일링 및 동적 스타일링
+
+```jsx
+// 이런 식으로 스타일링 가능 선택적으로 스타일링
+<TabButton
+  isSelected={selectedTopic === "state"}
+  onSelect={() => handleClick("state")}
+>
+  State
+</TabButton>;
+
+export default function TabButton({ children, onSelect, isSelected }) {
+  return (
+    <li>
+      <button className={isSelected ? "active" : undefined} onClick={onSelect}>
+        {children}
+      </button>
+    </li>
+  );
+}
+```
+
+## 리스트의 동적 출력
+
+```jsx
+<CoreConcept
+  title={CORE_CONCEPTS[0].title}
+  description={CORE_CONCEPTS[0].description}
+  image={CORE_CONCEPTS[0].image}
+/>
+<CoreConcept {...CORE_CONCEPTS[1]} />
+<CoreConcept {...CORE_CONCEPTS[2]} />
+<CoreConcept {...CORE_CONCEPTS[3]} />
+
+// 위의 부분을 아래와 같이 수정가능 이렇게 하면 배열 인덱스가 없는 부분 신경 쓸 필요 없음.
+{CORE_CONCEPTS.map((conceptItem) => (
+              <CoreConcept key={conceptItem.title} {...conceptItem} />
+            ))}
+
+```

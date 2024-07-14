@@ -52,4 +52,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
 - React Developer Tools 를 크롬 익스텐션에 받음.
 - Profiler 페이지 옆에 non-private 창에 들어가면 component 트리 확인 가능. 복잡한 UI에서 분석하고 이해하는 데 유용함. 개발자 툴의 외관도 제어 가능
 - 컴포넌트 하나 누르면 그 컴포넌트에 대해서 배울 수 있음. 다양한 속성 및 변수 값 확인 가능.
-- state 관리 같은거는 밑에 hook 에서 확인 가능함.
+- state 관리 같은거는 밑에 hook 에서 확인 가능함. UI들의 어떤 부분들이 어떤 컴포넌트에 의해 관리되는지 이해 가능, 트리 수정하는데 사용도 가능, prop state 변화가 UI에 어떻게 반영되는지도 확인 가능

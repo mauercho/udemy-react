@@ -170,3 +170,24 @@ export default function AvailablePlaces({ onSelectPlace }) {
   );
 }
 ```
+
+## 코드 추출 및 코드 개선
+
+- 외부로 코드를 옮겨서 재사용될 수 있게 할 수 있음.
+
+```js
+// http.js
+export async function fetchAvailablePlaces() {
+  const response = await fetch("http://localhost:3000/places");
+  const resData = await response.json();
+
+  if (!response.ok) {
+    const error = new Error("Failed to fetch places.");
+    throw error;
+  }
+  return resData.places;
+}
+
+// AvailablePlaces.jsx
+const places = await fetchAvailablePlaces(); // 비동기함수 받을땐 await 써줘야함. 안 써주면 그냥 이상한 값 받을거임.
+```

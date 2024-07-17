@@ -191,3 +191,83 @@ export async function fetchAvailablePlaces() {
 // AvailablePlaces.jsx
 const places = await fetchAvailablePlaces(); // 비동기함수 받을땐 await 써줘야함. 안 써주면 그냥 이상한 값 받을거임.
 ```
+
+- POST 요청으로 데이터 전송
+
+```js
+export async function updatePlaces(places) {
+  const response = fetch("http://localhost:3000/user-places", {
+    method: "PUT",
+    body: JSON.stringify({ places: places }),
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
+
+  const resData = await response.json();
+
+  if (!response.ok) {
+    throw new Error("Failed to update user data.");
+  }
+  return resData.message;
+}
+```
+
+- 아래와 같은 식으로 받아옴. 형식에 맞춰서 body 에 보내줌. body: JSON.stringify({ places: places }),
+
+```jsx
+try {
+  await updatePlaces([selectedPlace, ...userPlaces]);
+} catch (error) {
+  setUserPlaces(userPlaces);
+  setErrorUpdatingPlaces({
+    message: error.message || "Failed to update places.",
+  });
+  // 이렇게 하면 에러 났을때 예전꺼 넣어줌.
+}
+```
+
+## 최적의 업데이트 방법
+
+- const [errorUpdatingPlaces, setErrorUpdatingPlaces] = useState(); 이걸 만들어서 에러 업데이트 가능하게 만들어주고
+
+```jsx
+<Modal open={errorUpdatingPlaces} onClose={handleError}>
+  {errorUpdatingPlaces && (
+    <Error
+      title="An error occurred!"
+      message={errorUpdatingPlaces.message}
+      onConfirm={handleError}
+    />
+  )}
+</Modal>
+```
+
+- 이런식으로 에러 날때마다 모달로 띄우는 방법이 있음.
+
+## 데이터 삭제 요청
+
+```jsx
+const handleRemovePlace = useCallback(
+  async function handleRemovePlace() {
+    setUserPlaces((prevPickedPlaces) =>
+      prevPickedPlaces.filter((place) => place.id !== selectedPlace.current.id)
+    );
+
+    try {
+      await updatePlaces(
+        userPlaces.filter((place) => place.id !== selectedPlace.current.id)
+      );
+    } catch (error) {
+      setUserPlaces(userPlaces);
+      setErrorUpdatingPlaces({
+        message: error.message || "Failed to delete place.",
+      });
+    }
+    setModalIsOpen(false);
+  },
+  [userPlaces]
+);
+```
+
+- 이거 추가해서 삭제 구현 상태 업데이트 할 때와 똑같은 로직임.

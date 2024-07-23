@@ -199,3 +199,160 @@ export default function NewEvent() {
 - 이런 식으로 써주면 된다. data도 받을 수 있는데 여기서는 안씀
 - POST 요청 보낼때는 캐시처리 안하기 때문에 보통 mutationKey 사용하지 않음.
 - 렌더링 될 때 useQuery마냥 즉시 사용되는게 아니라 mutate 쓸때만 적용됨. 백엔드에 필요한 데이터의 형태에 맞춰 formData 전달함.
+
+```jsx
+export default function NewEvent() {
+  const navigate = useNavigate();
+
+  const { mutate, isPending, isError, error } = useMutation({
+    mutationFn: createNewEvent,
+  });
+  function handleSubmit(formData) {
+    mutate({ event: formData });
+  }
+
+  return (
+    <Modal onClose={() => navigate("../")}>
+      <EventForm onSubmit={handleSubmit}>
+        {isPending && "Submitting..."}
+        {!isPending && (
+          <>
+            <Link to="../" className="button-text">
+              Cancel
+            </Link>
+            <button type="submit" className="button">
+              Create
+            </button>
+          </>
+        )}
+      </EventForm>
+      {isError && (
+        <ErrorBlock
+          title="Failed to create event"
+          message={
+            error.info?.message ||
+            "Failed to create event. Please check your input and try again."
+          }
+        />
+      )}
+    </Modal>
+  );
+}
+```
+
+- 최종적으로 error 까지 넣은거임.
+- EventForm.jsx 파일 변경함.
+
+## 변형 성공 시 동작 및 쿼리 무효화
+
+```jsx
+function handleSubmit(formData) {
+  mutate({ event: formData });
+  navigate("/events");
+}
+```
+
+- 제출 할때 이렇게 써줄 수 있음. 그러나 변형의 성공 여부와 상관 없이 페이지 나가게 됨.
+
+```jsx
+const { mutate, isPending, isError, error } = useMutation({
+  mutationFn: createNewEvent,
+  onSuccess: () => {
+    navigate("/events");
+  },
+});
+```
+
+- useMutation에 onSuccess 있는데 성공할때만 navigate 호출
+- navigate 호출해도 변형된 정보들이 뜨지 않음. 다른 페이지로 이동했다가 다시 돌아와야함.
+- 데이터가 변경된 것이 확실한 경우에 리액트 쿼리가 즉시 데이터를 가져오게 하고 싶음.
+- 리액트 쿼리에서 제공하는 메소드를 이용해 하나 이상의 쿼리를 무효화 하여 데이터가 오래돼서 다시 가져와야한다는 것을 리액트 쿼리에 알려줄 수 있음.
+
+```jsx
+// 기존 App.jsx
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+export const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  );
+}
+
+// 변형
+//http.js
+import { QueryClient } from "@tanstack/react-query";
+export const queryClient = new QueryClient();
+
+// App.jsx
+import { queryClient } from "./util/http.js";
+
+// NewEvent.jsx
+import { queryClient } from "../../util/http.js";
+const { mutate, isPending, isError, error } = useMutation({
+  mutationFn: createNewEvent,
+  onSuccess: () => {
+    queryClient.invalidateQueries({ queryKey: ["events"] });
+    navigate("/events");
+  },
+});
+```
+
+- queryClient.invalidateQueries({ queryKey: ["events"] }); 으로 성공했을때 'events' 가 포함된 쿼리 키를 무효화함. queryKey: ["events", { search: searchTerm }], 이것도 무효화함.
+- queryClient.invalidateQueries({ queryKey: ["events"], exact:true }); 쓰면 정확히 일치하는 쿼리만 무효화됨.
+- 위 같은 경우는 FindEventSection 에서 사용자가 입력한 검색어를 기준으로 이벤트를 검색하는데 당연히 새로 추가된 이벤트도 범위에 넣어야하므로 exact:true 써줄 필요 없음.
+
+## 무효화 후 자동 다시 가져오기 비활성화
+
+- 삭제할때 주의할점.
+
+```jsx
+const { mutate } = useMutation({
+  mutationFn: deleteEvent,
+  onSuccess: () => {
+    queryClient.invalidateQueries({
+      queryKey: ["events"],
+    });
+    navigate("/events");
+  },
+});
+```
+
+- invalidateQueries 이거 할때 무효화 되므로 리액트 쿼리가 즉시 세부 정보 쿼리의 다시 가져오기 트리거함. 세부 정보 페이지에 있기 때문에 이것도 가져올라고 하는데 없어서 로그에 에러메세지를 뜸.
+
+```jsx
+const { mutate } = useMutation({
+  mutationFn: deleteEvent,
+  onSuccess: () => {
+    queryClient.invalidateQueries({
+      queryKey: ["events"],
+      refetchType: "none",
+    });
+    navigate("/events");
+  },
+});
+```
+
+- 이러면 기존 쿼리가 즉시 자동으로 트리거 되지 않음.
+
+```jsx
+const {
+  mutate,
+  isPending: isPendingDeletion,
+  isError: isErrorDeleting,
+  error: deleteError,
+} = useMutation({
+  mutationFn: deleteEvent,
+  onSuccess: () => {
+    queryClient.invalidateQueries({
+      queryKey: ["events"],
+      refetchType: "none",
+    });
+    navigate("/events");
+  },
+});
+```
+
+- 이런 식으로 써줄 수 있음. 위 경우는 useQuery랑 겹쳐가지고 이름 바꿈.

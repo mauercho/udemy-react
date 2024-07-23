@@ -236,10 +236,9 @@ export default function TabButton({ children, onSelect }) {
 
 ```jsx
 function handleClick(selectedButton) {
-    console.log(selectedButton);
-  }
-TabButton onSelect={() => handleClick("component")}>
-              Components</TabButton>
+  console.log(selectedButton);
+}
+<TabButton onSelect={() => handleClick("component")}>Components</TabButton>;
 ```
 
 ## State 관리 & 훅 사용법

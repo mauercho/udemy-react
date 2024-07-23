@@ -101,3 +101,101 @@ function App() {
 ```
 
 - 이제 데이터베이스에서 데이터 변경된경우 실시간으로 바로 바뀐거 반영됨.
+
+## 쿼리 동작 이해 및 구성 -> 캐시 및 만료된 데이터
+
+- Tanstack의 중요한 기능 중 하나 캐시 처리. 리액트 쿼리는 응답 데이터를 캐시 처리함.
+- 커스텀 fetch 로직을 사용할 때는 새 요청을 전송해서 다시 데이터 가져와야 했음.
+- 응답 데이터를 캐시 처리하고 나중에 동일한 쿼리 키를 가진 다른 useQuery가 실행되면 이 데이터를 재사용함. 컴포넌트 함수가 다시 실행되면 리액트 쿼리가 확인후 캐시 처리된 데이터면 데이터 즉시 제공
+- 동시에 내부적으로 요청 재전송해서 업데이트된 내용 있나 확인 후 교체
+
+```jsx
+const { data, isPending, isError, error } = useQuery({
+  queryKey: ["events"],
+  queryFn: fetchEvents,
+  staleTime: 5000,
+  gcTime: 30000,
+});
+```
+
+- gcTime 데이터와 캐시를 얼마나 보관할지 설정. 기본은 5분임.
+- staleTime: 업데이트된 데이터를 가져오기 위한 자체적인 요청을 staleTime 이후에 함.
+
+## 동적 쿼리 함수 및 쿼리 키
+
+```jsx
+const { data, isPending, isError, error } = useQuery({
+  queryKey: ["events", { search: searchTerm }],
+  queryFn: () => fetchEvents(searchTerm),
+});
+```
+
+- 이런 식으로 queryKey 넣어주면 입력값에 따라 중복되지 않고 다양한 입력 값에 따라 캐싱 가능함.
+
+```jsx
+export async function fetchEvents(searchTerm) {
+  let url = "http://localhost:3000/events";
+
+  if (searchTerm) {
+    url += "?search=" + searchTerm;
+  }
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const error = new Error("An error occurred while fetching the events");
+    error.code = response.status;
+    error.info = await response.json();
+    throw error;
+  }
+
+  const { events } = await response.json();
+
+  return events;
+}
+```
+
+- fetchEvents 자체도 이런 식으로 바꿀 수 있음.
+
+## 쿼리 구성 객체 및 요청 취소
+
+- Network 탭 들어가면: http://localhost:3000/events?search=[object%20Object] 뜸/
+- 위의 코드에서 console.log(searchTerm) 해보면 결과에 signal 있는거 확인 가능
+- 리액트 쿼리는 쿼리 함수에 기본적으로 데이터를 전달함.
+- 위의 예시에서는 fetchEvents에 데이터 전달. 전달되는 데이터는 쿼리에 사용된 쿼리키와 신호에 대한 정보 제공하는 객체
+- 신호는 요청 취소할 때 필요함.
+- 객체 구조 분해 이용해서 추출 가능
+- export async function fetchEvents({ signal, searchTerm })
+
+```jsx
+const { data, isPending, isError, error } = useQuery({
+  queryKey: ["events", { search: searchTerm }],
+  queryFn: ({ signal }) => fetchEvents({ signal, searchTerm }),
+});
+```
+
+## 쿼리 활성화 및 비활성화
+
+- useQuery 구성객체에 enabled 있음. default는 true인데 false로 설정하면 쿼리 비활성화되고 요청 전송되지 않음.
+- const [searchTerm, setSearchTerm] = useState(undefined) 이런 식으로 undefined로 줘서 처음에만 enabled false로 만들 수 있음.
+- isLoading과 isPending의 차이는 쿼리가 비활성화되었다고 해서 True가 되지 않음. 예제 같은 경우 비활성화되었을떄 isPending이 true 가 되어서 LoadingIndicator 컴포넌트가 실행되었었음.
+
+## 변형을 사용하여 데이터 변경
+
+- useQuery는 데이터 가져올 때만 씀.
+- 데이터를 전송하고 POST 요청을 하려면 useMutation 사용해야함. 최적화되어있다고 보면됨.
+- useMutation은 컴포넌트가 렌더링 될때 즉시 전송되지 않고 필요할때만 요청 전송되게 할 수 있음.
+
+```jsx
+export default function NewEvent() {
+  const { mutate } = useMutation({
+    mutationFn: createNewEvent,
+  });
+  function handleSubmit(formData) {
+    mutate({ event: formData });
+  }
+}
+```
+
+- 이런 식으로 써주면 된다. data도 받을 수 있는데 여기서는 안씀
+- POST 요청 보낼때는 캐시처리 안하기 때문에 보통 mutationKey 사용하지 않음.
+- 렌더링 될 때 useQuery마냥 즉시 사용되는게 아니라 mutate 쓸때만 적용됨. 백엔드에 필요한 데이터의 형태에 맞춰 formData 전달함.

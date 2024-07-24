@@ -356,3 +356,102 @@ const {
 ```
 
 - 이런 식으로 써줄 수 있음. 위 경우는 useQuery랑 겹쳐가지고 이름 바꿈.
+
+## 낙관적 업데이트
+
+- 업데이트하면 바로 수정이 되지 않는 문제 있음.
+- queryclient.invalidateQueries로 해결 가능한 부분임. but 이렇게 하면 변형이 완료될때까지 이동하는 상태에서 기다려야함.
+- 낙관적 업데이트 적용 가능. 업데이트 누르면 UI 즉시 업데이트됨. 그와 동시에 백엔드 응답 기다리고 백엔드 응답 실패하면 롤백하는 거임.
+
+```jsx
+const { mutate } = useMutation({
+  mutationFn: updateEvent,
+  onMutate: async (data) => {
+    const newEvent = data.event;
+
+    await queryClient.cancelQueries({ queryKey: ["events", data.id] });
+    queryClient.setQueryData(["events", data.id], newEvent);
+  },
+});
+```
+
+- onMutate 프로퍼티 이용 -> onMutate 의 함수는 mutate가 되는 즉시 실행됨. 즉 프로세스가 완료되기 전에 응답을 받기 전에 실행.
+- onMutate는 데이터 받음. 거기에 수정될 정보가 있음. queryClient.setQueryData(["events", data.id], newEvent) 로 직접 데이터 수정함.
+- setQueryData의 첫번째 인수는 편집하려는 쿼리의 키, 두번째 인수는 저장하려는 새 데이터
+- 또 다른 작업 필요한데 특정 키의 모든 활성 쿼리를 취소하는 것 -> cancelQueries 이용. 비동기 함수이기떄문에 await 넣어서 끝나고 다음 줄 진행하도록 함. 해당 쿼리의 응답데이터와 낙관적으로 업데이트된 쿼리 데이터가 충돌하지 않게됨.
+
+- 업데이트 실패해도 롤백 해야함.
+
+```jsx
+const { mutate } = useMutation({
+  mutationFn: updateEvent,
+  onMutate: async (data) => {
+    const newEvent = data.event;
+
+    await queryClient.cancelQueries({ queryKey: ["events", params.id] });
+    const previousEvent = queryClient.getQueryData(["events", params.id]);
+    queryClient.setQueryData(["events", data.id], newEvent);
+
+    return { previousEvent };
+  },
+  onError: (error, data, context) => {
+    queryClient.setQueryData(["events", params.id], context.previousEvent);
+  },
+  onSettled: () => {
+    queryClient.invalidateQueries(["events", params.id]);
+  },
+});
+```
+
+- onError context 부분은 onMutate에서 return 되는 값이 들어감. 에러가 났을때 기존 값으로 다시 세팅하는 거임.
+- onSettled은 성공 여부와 상관 없이 mutation이 완료될때마다 호출됨. 여기서 백엔드에 있는 것과 동일한 데이터가 프론트엔드에 있는지 확인하기 위하여 다시 quryClient를 사용하여 query 무효화
+
+## 쿼리 키를 쿼리 함수 입력으로 사용
+
+```js
+//app.js
+app.get('/events', async (req, res) => {
+  const { max, search } = req.query;
+  const eventsFileContent = await fs.readFile('./data/events.json');
+  let events = JSON.parse(eventsFileContent);
+  if (search) {
+    events = events.filter((event) => {
+      const searchableText = `${event.title} ${event.description} ${event.location}`;
+      return searchableText.toLowerCase().includes(search.toLowerCase());
+    });
+  }
+
+  if (max) {
+    events = events.slice(events.length - max, events.length);
+  }
+// 보면 max 받을수 있는거 확인가능
+```
+
+- http.js 변경
+
+```js
+export async function fetchEvents({ signal, searchTerm, max }) {
+  let url = "http://localhost:3000/events";
+
+  if (searchTerm && max) {
+    url += "?search=" + searchTerm + "&max=" + max;
+  } else if (searchTerm) {
+    url += "?search=" + searchTerm;
+  } else if (max) {
+    url += "?max=" + max;
+  }
+```
+
+- NewEventsSection.jsx 변경
+
+```jsx
+export default function NewEventsSection() {
+  const { data, isPending, isError, error } = useQuery({
+    queryKey: ["events", { max: 3 }],
+    queryFn: ({ signal, queryKey }) => fetchEvents({ signal, ...queryKey[1] }),
+    staleTime: 5000,
+    gcTime: 30000,
+  });
+```
+
+- queryFn: ({ signal, queryKey }) => fetchEvents({ signal, ...queryKey[1] }), 이 부분을 queryFn: ({ signal }) => fetchEvents({ signal, max:3 }), 이렇게 바꿔도 됨.
